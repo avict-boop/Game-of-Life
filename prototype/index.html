@@ -1,0 +1,694 @@
+<title>Линия — микробный мат</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one-screen app — header strip, dark-field microscope canvas, side panel with the cell's energy balance; modal sheets for summary and draft. Single deliberate dark world (dark-field microscopy). */
+:root {
+  --bg: #0a1317;
+  --panel: #101d23;
+  --panel-2: #15262d;
+  --line: #22363f;
+  --fg: #dbe6e3;
+  --muted: #8ca3a1;
+  --sun: #f0c06a;
+  --own: #5fd6c8;
+  --ferm: #bda75a;
+  --purp: #cf7fcf;
+  --bad: #ef6f5e;
+  --good: #82d27c;
+  --display: "Unbounded", "Golos Text", system-ui, sans-serif;
+  --body: "Golos Text", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 14px;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, .card:focus-visible { outline: 2px solid var(--sun); outline-offset: 2px; }
+
+header.bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px;
+  padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  border-bottom: 1px solid var(--line); background: var(--panel);
+}
+.brand { font-family: var(--display); font-weight: 700; font-size: 15px; letter-spacing: .02em; }
+.brand small { font-family: var(--body); font-weight: 500; color: var(--muted); font-size: 12px; margin-left: 8px; letter-spacing: 0; }
+.stat { font-family: var(--mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.stat b { color: var(--fg); font-weight: 600; }
+.share { flex: 1 1 220px; min-width: 160px; display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: var(--line); }
+.share span { height: 100%; transition: width .4s; }
+.ctrl { display: flex; gap: 6px; }
+.btn {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; font-size: 12px;
+}
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--sun); color: #1b1408; border-color: var(--sun); font-weight: 600; }
+
+main { flex: 1; display: flex; min-height: 0; }
+.stage { flex: 1; position: relative; min-width: 0; display: flex; align-items: center; justify-content: center; background: #060d10; }
+canvas { display: block; max-width: 100%; max-height: 100%; touch-action: none; cursor: crosshair; }
+aside {
+  width: 290px; flex: none; border-left: 1px solid var(--line); background: var(--panel);
+  overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 16px;
+}
+aside h3 { margin: 0 0 8px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.bal { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; font-size: 13px; }
+.bal .v { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+.bal .in { color: var(--good); } .bal .out { color: var(--bad); }
+.bal .sum { border-top: 1px solid var(--line); padding-top: 4px; font-weight: 600; }
+.meter { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 4px; }
+.meter i { display: block; height: 100%; }
+.genes { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-size: 12px; padding: 3px 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel-2); }
+.hint { font-size: 12px; color: var(--muted); line-height: 1.5; margin: 0; }
+.legend { display: grid; gap: 6px; font-size: 13px; }
+.legend div { display: flex; align-items: center; gap: 8px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+
+.modal { position: absolute; inset: 0; background: rgba(4, 9, 11, .78); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 5; overflow-y: auto; }
+.sheet { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; max-width: 760px; width: 100%; padding: 22px; display: flex; flex-direction: column; gap: 16px; max-height: 100%; overflow-y: auto; }
+.sheet h2 { font-family: var(--display); font-size: 20px; margin: 0; text-wrap: balance; font-weight: 700; }
+.sheet p { margin: 0; line-height: 1.55; max-width: 65ch; }
+.chron { border-left: 2px solid var(--sun); padding-left: 12px; color: var(--fg); }
+.chron b { color: var(--sun); font-weight: 600; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.card {
+  text-align: left; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 14px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.card:hover { border-color: var(--sun); }
+.card .k { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.card .n { font-family: var(--display); font-size: 15px; font-weight: 500; }
+.card .e { font-size: 13px; line-height: 1.45; }
+.card .c { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.card .s { font-size: 12px; color: var(--muted); line-height: 1.45; border-top: 1px solid var(--line); padding-top: 8px; margin-top: auto; }
+.rare { color: var(--sun) !important; }
+.rows { display: grid; gap: 8px; }
+.row { display: grid; grid-template-columns: 150px 1fr 64px; gap: 10px; align-items: center; font-size: 13px; }
+.row .bar { height: 10px; border-radius: 3px; background: var(--line); overflow: hidden; display: flex; }
+.row .v { font-family: var(--mono); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; background: var(--panel-2); }
+
+@media (max-width: 820px) {
+  .modal { position: fixed; padding-top: calc(16px + env(safe-area-inset-top, 0px)); padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+  main { flex-direction: column; overflow-y: auto; }
+  .stage { flex: none; }
+  aside { width: auto; border-left: 0; border-top: 1px solid var(--line); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .row { grid-template-columns: 110px 1fr 56px; }
+}
+@media (prefers-reduced-motion: reduce) { .share span { transition: none; } }
+</style>
+
+<header class="bar">
+  <div class="brand">Линия<small>Эпоха 1 · микробный мат · прототип</small></div>
+  <div class="stat">Поколение <b id="gen">1</b></div>
+  <div class="stat">Осталось <b id="timer">75</b> с</div>
+  <div class="share" id="share" aria-label="Доли линий в популяции"></div>
+  <div class="ctrl">
+    <button class="btn" id="speed" aria-pressed="false">Скорость ×1</button>
+    <button class="btn" id="pause">Пауза</button>
+  </div>
+</header>
+
+<main>
+  <div class="stage" id="stage">
+    <canvas id="cv" width="960" height="600" aria-label="Поле микробного мата"></canvas>
+    <div class="modal" id="modal"></div>
+  </div>
+  <aside>
+    <section>
+      <h3>Баланс вашей клетки, Э/такт</h3>
+      <div class="bal" id="bal"></div>
+      <div style="margin-top:10px" class="stat">Запас энергии до деления</div>
+      <div class="meter"><i id="eMeter" style="background:var(--own);width:0"></i></div>
+      <div style="margin-top:8px" class="stat">Повреждения ДНК</div>
+      <div class="meter"><i id="dMeter" style="background:var(--bad);width:0"></i></div>
+    </section>
+    <section>
+      <h3>Геном линии</h3>
+      <div class="stat" id="gstat" style="margin-bottom:8px"></div>
+      <div class="genes" id="genes"></div>
+    </section>
+    <section>
+      <h3>Линии</h3>
+      <div class="legend">
+        <div><span class="dot" style="background:var(--own)"></span>Ваша линия</div>
+        <div><span class="dot" style="background:var(--ferm)"></span>Бродильщики: мелкие, без жгутика</div>
+        <div><span class="dot" style="background:var(--purp)"></span>Пурпурные серные бактерии: свет + H₂S</div>
+      </div>
+    </section>
+    <section>
+      <h3>Управление</h3>
+      <p class="hint">Клик или касание: куда плыть. Также <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> или стрелки. <kbd>Пробел</kbd> — пауза. Ваша клетка обведена кольцом; если она погибнет, управление перейдёт к родственнице.</p>
+    </section>
+  </aside>
+</main>
+
+<script>
+"use strict";
+// ---------- Константы модели (docs/epoch-1-prokaryotes.md, §3) ----------
+const W = 960, H = 600, GS = 20, GW = W / GS, GH = H / GS;
+const P = { a: 3.0, K: 1.0, b: 1.5, m: 0.02, e: 1.0, g: 2e-5, d: 2e-4, mumax: 1.5 };
+const TS = 0.06;            // тактов модели в секунду игры
+const KP = 13;              // сила фотосинтеза
+const LIFE = 75;            // длительность жизни, с
+const START_POP = 42;       // клеток в начале поколения
+const MAX_CELLS = 320;
+const M0 = P.m * 0.125 + P.g * 600;   // базовое поддержание стартовой клетки
+const LIN = {
+  own:  { name: "Ваша линия", color: "#5fd6c8" },
+  ferm: { name: "Бродильщики", color: "#bda75a" },
+  purp: { name: "Пурпурные", color: "#cf7fcf" },
+};
+const ORDER = ["own", "ferm", "purp"];
+
+// ---------- Карты мутаций ----------
+const CARDS = {
+  big:   { name: "Крупнее", group: "Форма", G: 10, cost: 0, rep: true, w: 10,
+           eff: "Радиус ×1,25. Больше поверхности, но объём растёт быстрее.",
+           sci: "Поверхность ∝ r², объём ∝ r³. Крупной клетке труднее прокормиться.",
+           apply: g => { g.r = Math.min(2.2, g.r * 1.25); } },
+  small: { name: "Мельче", group: "Форма", G: 10, cost: 0, rep: true, w: 10,
+           eff: "Радиус ×0,8. Дешевле деление, выше отношение S/V.",
+           sci: "Океанские олиготрофы вроде SAR11 — одни из самых мелких клеток.",
+           apply: g => { g.r = Math.max(0.25, g.r * 0.8); } },
+  flag:  { name: "Жгутик", group: "Движение", G: 50, cost: 0.3, w: 10,
+           eff: "Скорость ×5. Ваша клетка и родня плавают «бег — кувырок».",
+           sci: "Жгутик почти не ускоряет поглощение (Purcell, 1977). Он помогает найти еду, а не съесть её.",
+           apply: g => { g.flag = true; } },
+  chemo: { name: "Хемотаксис", group: "Движение", G: 15, cost: 0.05, w: 10, req: g => g.flag,
+           eff: "Родня реже «кувыркается», когда еды становится больше, и плывёт вверх по градиенту.",
+           sci: "Так плавает E. coli: смещённое случайное блуждание через белки MCP и CheY.",
+           apply: g => { g.chemo = true; } },
+  etc:   { name: "Электрон-транспортная цепь", group: "Метаболизм", G: 40, cost: 0.1, w: 10,
+           eff: "Анаэробное дыхание на сульфате: выход энергии из органики 2 → 6.",
+           sci: "Протонный градиент на мембране и АТФ-синтаза — универсальная энергетика жизни.",
+           apply: g => { g.Y = 6; g.etc = true; } },
+  photo: { name: "Аноксигенный фотосинтез", group: "Метаболизм", G: 80, cost: 0.15, w: 4, rare: true, req: g => g.etc,
+           eff: "Энергия от света, если рядом есть H₂S. Лучше всего — в среднем слое мата.",
+           sci: "Пурпурные и зелёные бактерии: одна фотосистема, донор электронов — H₂S, кислород не выделяется.",
+           apply: g => { g.photo = true; } },
+  tr:    { name: "Больше переносчиков", group: "Мембрана", G: 15, cost: 0.1, rep: true, w: 8,
+           eff: "Переносчики ×1,5. Помогает только там, где еды много.",
+           sci: "В бедной среде клетка упирается в диффузию, а не в число переносчиков (Berg & Purcell, 1977).",
+           apply: g => { g.tr *= 1.5; } },
+  stores:{ name: "Запасные гранулы", group: "Метаболизм", G: 20, cost: 0.05, w: 8,
+           eff: "Голодание переносится вдвое дольше.",
+           sci: "Гликоген и полифосфат — «аккумуляторы» бактерий.",
+           apply: g => { g.stores = true; } },
+  repair:{ name: "Репарация ДНК (SOS)", group: "Защита", G: 30, cost: 0.05, w: 8,
+           eff: "Повреждения от ультрафиолета у поверхности −60 %.",
+           sci: "До озонового слоя УФ у поверхности был губителен. Белок RecA запускает починку ДНК.",
+           apply: g => { g.repair = true; } },
+  capsule:{ name: "Капсула", group: "Защита", G: 20, cost: 0.05, w: 8,
+           eff: "Шанс заражения фагом −50 %.",
+           sci: "Полисахаридная оболочка прячет рецепторы, к которым прикрепляются фаги.",
+           apply: g => { g.capsule = true; } },
+  bact:  { name: "Бактериоцины", group: "Защита", G: 25, cost: 0.1, w: 6,
+           eff: "Чужие клетки рядом с вашими получают на 30 % меньше энергии.",
+           sci: "Токсины против близких конкурентов, например колицины E. coli.",
+           apply: g => { g.bact = true; } },
+  slim:  { name: "Чистка генома", group: "Геном", G: 0, cost: 0, rep: true, w: 6, req: g => g.G > 700,
+           eff: "Геном −10 %: дешевле поддержание и деление.",
+           sci: "Генетическое упрощение: в бедной среде «лишние» гены отбрасываются.",
+           apply: g => { g.G = Math.round(g.G * 0.9); } },
+};
+
+function newGenome(kind) {
+  const g = { r: 0.5, G: 600, Y: 2, tr: 1, cost: 0, flag: false, chemo: false, etc: false, photo: false,
+              stores: false, repair: false, capsule: false, bact: false, vesicles: false, cards: [] };
+  if (kind === "ferm") { g.r = 0.4; g.G = 700; }
+  if (kind === "purp") { g.r = 0.6; g.G = 1000; g.etc = true; g.photo = true; g.vesicles = true; g.cost = 0.3; }
+  return g;
+}
+function takeCard(g, id) {
+  const c = CARDS[id];
+  c.apply(g); g.G += c.G; g.cost += c.cost; g.cards.push(id);
+}
+function cardAllowed(g, id) {
+  const c = CARDS[id];
+  if (!c.rep && g.cards.includes(id)) return false;
+  if (id === "etc" && g.etc) return false;
+  if (id === "photo" && g.photo) return false;
+  return !c.req || c.req(g);
+}
+
+// ---------- Энергетика клетки ----------
+const light = y => Math.exp(-y / 170);
+const uv = y => Math.max(0, 1 - y / 110);
+const h2sBase = y => { const t = Math.max(0, (y - 180) / 400); return 2 * Math.pow(Math.min(1.3, t), 1.4); };
+function balance(g, C, S, y) {
+  const r = g.r, V = r * r * r;
+  let food = 0;
+  if (C > 1e-6) {
+    const jt = P.a * g.tr * r * r * C / (P.K + C), jd = P.b * r * C;
+    food = g.Y / (1 / jt + 1 / jd);
+  }
+  const photo = g.photo ? KP * r * r * light(y) * S / (0.3 + S) : 0;
+  const mV = P.m * V, mG = P.g * g.G, mT = g.cost * M0;
+  const ediv = P.e * V + P.d * g.G;
+  return { food, photo, mV, mG, mT, net: food + photo - mV - mG - mT, ediv };
+}
+
+// ---------- Состояние мира ----------
+let S = null;
+function newWorld() {
+  return {
+    gen: 1, t: 0, cells: [], phages: [], org: new Float32Array(GW * GH), sup: new Float32Array(GW * GH),
+    h2s: new Float32Array(GW * GH), genomes: { own: newGenome("own"), ferm: newGenome("ferm"), purp: newGenome("purp") },
+    stats: null, player: null, phase: "intro", history: [], speed: 1, paused: false, phageAt: -1,
+  };
+}
+function placeHotspots() {
+  S.sup.fill(0);
+  const n = 4 + Math.floor(Math.random() * 2), spots = [];
+  for (let i = 0; i < n; i++) spots.push({ x: 60 + Math.random() * (W - 120), y: 140 + Math.random() * (H - 200), s: 60 + Math.random() * 70, a: 0.5 + Math.random() * 0.5 });
+  for (let j = 0; j < GH; j++) for (let i = 0; i < GW; i++) {
+    const x = (i + .5) * GS, y = (j + .5) * GS;
+    let v = 0.004;
+    for (const p of spots) v += p.a * 0.05 * Math.exp(-((x - p.x) ** 2 + (y - p.y) ** 2) / (2 * p.s * p.s));
+    S.sup[j * GW + i] = v;
+  }
+}
+function initFields() {
+  for (let k = 0; k < GW * GH; k++) { S.org[k] = S.sup[k] / 0.03; }
+  for (let j = 0; j < GH; j++) for (let i = 0; i < GW; i++) S.h2s[j * GW + i] = h2sBase((j + .5) * GS);
+}
+function mkCell(lin, x, y) {
+  const a = Math.random() * Math.PI * 2;
+  return { lin, x, y, dir: a, E: Math.random() * 0.4, dmg: 0, starve: 0, inf: -1, lastNet: 0, res: Math.random(), id: Math.random() };
+}
+function spawnFresh() {
+  const n = { own: 14, ferm: 14, purp: 14 };
+  for (const lin of ORDER) for (let i = 0; i < n[lin]; i++) {
+    const y = lin === "purp" ? 260 + Math.random() * 120 : 120 + Math.random() * 440;
+    S.cells.push(mkCell(lin, 30 + Math.random() * (W - 60), y));
+  }
+}
+function beginLife() {
+  S.t = 0; S.phages = [];
+  S.stats = { births: { own: 0, ferm: 0, purp: 0 }, deaths: { starve: 0, uv: 0, phage: 0 },
+              en: { food: 0, photo: 0, mV: 0, mG: 0, mT: 0 }, start: countLin() };
+  S.phageAt = (S.gen >= 3 && Math.random() < 0.45) ? 15 + Math.random() * 30 : -1;
+  pickPlayer();
+}
+function countLin() {
+  const c = { own: 0, ferm: 0, purp: 0 };
+  for (const k of S.cells) c[k.lin]++;
+  return c;
+}
+function pickPlayer() {
+  const own = S.cells.filter(c => c.lin === "own");
+  if (!own.length) { S.player = null; return; }
+  const ref = S.player || { x: W / 2, y: H / 2 };
+  own.sort((a, b) => (a.x - ref.x) ** 2 + (a.y - ref.y) ** 2 - ((b.x - ref.x) ** 2 + (b.y - ref.y) ** 2));
+  S.player = own[0];
+}
+
+// ---------- Шаг симуляции ----------
+const keys = new Set(); let target = null;
+function gidx(x, y) {
+  const i = Math.min(GW - 1, Math.max(0, Math.floor(x / GS))), j = Math.min(GH - 1, Math.max(0, Math.floor(y / GS)));
+  return j * GW + i;
+}
+function step(dt) {
+  S.t += dt;
+  // поля: подвод, распад, диффузия
+  const org = S.org, nx = new Float32Array(org.length), hs = S.h2s;
+  for (let j = 0; j < GH; j++) for (let i = 0; i < GW; i++) {
+    const k = j * GW + i, c = org[k];
+    const l = i > 0 ? org[k - 1] : c, r = i < GW - 1 ? org[k + 1] : c, u = j > 0 ? org[k - GW] : c, d = j < GH - 1 ? org[k + GW] : c;
+    nx[k] = Math.max(0, c + dt * (S.sup[k] - 0.03 * c + 0.6 * (l + r + u + d - 4 * c)));
+    hs[k] += dt * 0.04 * (h2sBase((j + .5) * GS) - hs[k]);
+  }
+  S.org = nx;
+
+  const bactOwn = S.genomes.own.bact ? S.cells.filter(c => c.lin === "own") : null;
+  const born = [], dead = [];
+  for (const c of S.cells) {
+    const g = S.genomes[c.lin];
+    const k = gidx(c.x, c.y);
+    const b = balance(g, S.org[k], S.h2s[k], c.y);
+    let penal = 1;
+    if (bactOwn && c.lin !== "own") {
+      for (const o of bactOwn) { if (Math.abs(o.x - c.x) < 40 && Math.abs(o.y - c.y) < 40) { penal = 0.7; break; } }
+    }
+    let net = (b.food + b.photo) * penal - b.mV - b.mG - b.mT;
+    if (net > 0) net = Math.min(net, P.mumax * b.ediv);
+    // расход ресурсов из среды
+    S.org[k] = Math.max(0, S.org[k] - b.food * penal / g.Y * TS * dt * 28);
+    if (b.photo) S.h2s[k] = Math.max(0, S.h2s[k] - b.photo * TS * dt * 2.2);
+    c.E += net * TS * dt;
+    if (c.lin === "own") { const e = S.stats.en, f = TS * dt; e.food += b.food * penal * f; e.photo += b.photo * penal * f; e.mV += b.mV * f; e.mG += b.mG * f; e.mT += b.mT * f; }
+    if (c === S.player) c.bal = { ...b, food: b.food * penal, photo: b.photo * penal, net, penal };
+    // голод
+    if (c.E < 0) { c.E = 0; c.starve += dt; } else if (net > 0) c.starve = Math.max(0, c.starve - dt);
+    if (c.starve > (g.stores ? 16 : 8)) { dead.push([c, "starve"]); continue; }
+    // УФ
+    c.dmg += dt * (0.22 * uv(c.y) * (g.repair ? 0.4 : 1)) - dt * 0.015;
+    if (c.dmg < 0) c.dmg = 0;
+    if (c.dmg >= 1) { dead.push([c, "uv"]); continue; }
+    // фаг
+    if (c.inf >= 0) { c.inf += dt; if (c.inf > 4) { dead.push([c, "phage"]); continue; } }
+    // деление
+    if (c.E >= b.ediv && S.cells.length + born.length < MAX_CELLS) {
+      c.E -= b.ediv;
+      const a = Math.random() * Math.PI * 2, rr = 4 + g.r * 6;
+      const n = mkCell(c.lin, c.x + Math.cos(a) * rr, c.y + Math.sin(a) * rr);
+      n.E = 0; born.push(n); S.stats.births[c.lin]++;
+    }
+    move(c, g, dt, net);
+  }
+  // фаги: «убей победителя» — целятся в самую многочисленную линию
+  if (S.phageAt > 0 && S.t >= S.phageAt) {
+    S.phageAt = -1;
+    const cnt = countLin(); const tgt = ORDER.slice().sort((a, b) => cnt[b] - cnt[a])[0];
+    const host = S.cells.filter(c => c.lin === tgt);
+    for (let i = 0; i < 4 && host.length; i++) { const h = host[Math.floor(Math.random() * host.length)]; spawnPhages(h.x, h.y, 6, tgt); }
+    S.lastPhage = tgt;
+  }
+  for (const p of S.phages) {
+    p.life -= dt; p.x += (Math.random() - .5) * 60 * dt + p.vx * dt; p.y += (Math.random() - .5) * 60 * dt + p.vy * dt;
+    for (const c of S.cells) {
+      if (c.lin !== p.tgt || c.inf >= 0) continue;
+      const rr = 6 + S.genomes[c.lin].r * 6;
+      if (Math.abs(c.x - p.x) < rr && Math.abs(c.y - p.y) < rr) {
+        // часть клеток устойчива от природы (вариации рецепторов), капсула добавляет устойчивости
+        if (c.res < (S.genomes[c.lin].capsule ? 0.3 : 0.6) && Math.random() < 0.5) c.inf = 0;
+        p.life = 0; break;
+      }
+    }
+  }
+  S.phages = S.phages.filter(p => p.life > 0);
+  for (const [c, why] of dead) {
+    if (c.lin === "own") S.stats.deaths[why]++;
+    if (why === "phage") spawnPhages(c.x, c.y, 5, c.lin);
+    S.org[gidx(c.x, c.y)] += 0.25;   // лизис возвращает органику
+  }
+  if (dead.length) { const ds = new Set(dead.map(d => d[0])); S.cells = S.cells.filter(c => !ds.has(c)); }
+  S.cells.push(...born);
+  if (!S.player || !S.cells.includes(S.player)) pickPlayer();
+}
+function spawnPhages(x, y, n, tgt) {
+  for (let i = 0; i < n; i++) { const a = Math.random() * 6.28; S.phages.push({ x, y, vx: Math.cos(a) * 18, vy: Math.sin(a) * 18, life: 7, tgt }); }
+}
+function move(c, g, dt, net) {
+  let vx = (Math.random() - .5) * 16, vy = (Math.random() - .5) * 16;   // броуновский дрейф
+  if (c === S.player) {
+    const sp = g.flag ? 75 : 16;
+    let dx = 0, dy = 0;
+    if (keys.has("left")) dx--; if (keys.has("right")) dx++; if (keys.has("up")) dy--; if (keys.has("down")) dy++;
+    if (dx || dy) { target = null; const l = Math.hypot(dx, dy); vx += dx / l * sp; vy += dy / l * sp; }
+    else if (target) {
+      const tx = target.x - c.x, ty = target.y - c.y, l = Math.hypot(tx, ty);
+      if (l > 4) { vx += tx / l * sp; vy += ty / l * sp; } else target = null;
+    }
+  } else if (g.flag) {
+    // бег — кувырок; при хемотаксисе кувырки реже, если становится лучше
+    const better = net > c.lastNet + 1e-5;
+    const rate = g.chemo ? (better ? 0.4 : 1.6) : 1;
+    if (Math.random() < rate * dt) c.dir = Math.random() * Math.PI * 2;
+    vx += Math.cos(c.dir) * 40; vy += Math.sin(c.dir) * 40;
+  } else if (g.vesicles) {
+    vy += Math.sign(320 - c.y) * Math.min(10, Math.abs(320 - c.y));
+  }
+  c.lastNet = c.lastNet * 0.9 + net * 0.1;
+  c.x = Math.min(W - 4, Math.max(4, c.x + vx * dt));
+  c.y = Math.min(H - 4, Math.max(4, c.y + vy * dt));
+}
+
+// ---------- Конец жизни, отбор, драфт ----------
+function endLife() {
+  const cnt = countLin(), total = cnt.own + cnt.ferm + cnt.purp || 1;
+  const share = cnt.own / total;
+  S.history.push({ gen: S.gen, share, cnt });
+  if (cnt.own === 0 || share < 0.02) return showEnd(false, cnt, share);
+  if (share >= 0.6 && S.gen >= 4) return showEnd(true, cnt, share);
+  if (S.gen >= 10) return showEnd(share >= 0.34, cnt, share);
+  showSummary(cnt, share);
+}
+function nextGeneration() {
+  // отбор: в следующее поколение попадает выборка пропорционально численности
+  const cnt = countLin(), total = cnt.own + cnt.ferm + cnt.purp;
+  const keep = [];
+  for (const lin of ORDER) {
+    const pool = S.cells.filter(c => c.lin === lin);
+    let n = Math.round(START_POP * cnt[lin] / total);
+    if (cnt[lin] > 0) n = Math.max(n, 2);
+    for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+    for (const c of pool.slice(0, n)) { c.E = Math.random() * 0.2; c.dmg *= 0.5; c.starve = 0; c.inf = -1; keep.push(c); }
+  }
+  S.cells = keep;
+  // NPC тоже эволюционируют
+  if (S.gen >= 2) {
+    for (const lin of ["ferm", "purp"]) {
+      const g = S.genomes[lin];
+      const pool = (lin === "ferm" ? ["flag", "chemo", "small", "tr", "capsule", "repair", "etc", "stores"] : ["capsule", "repair", "stores", "flag", "chemo", "big"]).filter(id => cardAllowed(g, id));
+      if (pool.length) takeCard(g, pool[Math.floor(Math.random() * pool.length)]);
+    }
+  }
+  S.gen++;
+  placeHotspots();
+  beginLife(); S.phase = "play"; hideModal();
+}
+function draft() {
+  const g = S.genomes.own;
+  const pool = Object.keys(CARDS).filter(id => cardAllowed(g, id));
+  const out = [];
+  while (out.length < 3 && pool.length) {
+    const tot = pool.reduce((s, id) => s + CARDS[id].w, 0);
+    let r = Math.random() * tot, pick = pool[0];
+    for (const id of pool) { r -= CARDS[id].w; if (r <= 0) { pick = id; break; } }
+    out.push(pick); pool.splice(pool.indexOf(pick), 1);
+  }
+  return out;
+}
+
+// ---------- Летопись ----------
+function chronicle(cnt, share) {
+  const st = S.stats, e = st.en, g = S.genomes.own, out = [];
+  const inc = e.food + e.photo, cost = e.mV + e.mG + e.mT;
+  if (st.deaths.phage > 2) out.push(`<b>Фаг.</b> Вирус ударил по самой многочисленной линии. Так работает принцип «убей победителя»: фаги не дают одному виду захватить всю среду.`);
+  if (st.deaths.uv > 2 && !g.repair) out.push(`<b>Ультрафиолет.</b> ${st.deaths.uv} клеток погибли у поверхности. До появления озонового слоя УФ на мелководье был смертелен; спасала глубина или починка ДНК.`);
+  if (st.deaths.starve > 3) out.push(`<b>Голод.</b> ${st.deaths.starve} клеток умерли без еды. Поддержание генов и объёма не останавливается, даже когда пищи нет.`);
+  if (g.flag && !g.chemo) out.push(`<b>Жгутик без хемотаксиса.</b> Родня плавает быстро, но наугад. Чтобы скорость приносила пользу, клетке нужно чувствовать, лучше ли ей стало.`);
+  if (e.mT > 0.3 * cost && cost > 0) out.push(`<b>Цена признаков.</b> ${Math.round(e.mT / cost * 100)} % расходов — содержание приобретённых систем. Каждая новая система должна окупаться.`);
+  if (e.mG > e.mV && cost > 0) out.push(`<b>Цена генома.</b> Поддержание генов обходится дороже, чем объём клетки. У бактерий из бедных вод геномы поэтому маленькие.`);
+  if (e.photo > e.food && e.photo > 0) out.push(`<b>Свет.</b> Больше половины энергии линия получила от фотосинтеза. Пурпурные бактерии живут в среднем слое матов: выше нет H₂S, ниже нет света.`);
+  if (!out.length) out.push(`<b>Тихое поколение.</b> Доля линии ${share >= (S.history.at(-2)?.share ?? 0) ? "выросла" : "снизилась"}. Отбор действует и без катастроф: решают доли процента в скорости деления.`);
+  return out.slice(0, 2);
+}
+
+// ---------- UI ----------
+const $ = id => document.getElementById(id);
+const modal = $("modal");
+function hideModal() { modal.hidden = true; modal.innerHTML = ""; }
+function showModal(html) { modal.innerHTML = `<div class="sheet" role="dialog" aria-modal="true">${html}</div>`; modal.hidden = false; }
+function fmt(x, n = 3) { return x.toFixed(n).replace(".", ","); }
+
+function showIntro() {
+  showModal(`
+    <h2>Микробный мат, 3 миллиарда лет назад</h2>
+    <p>Вы — линия простых клеток: брожение, 600 генов, радиус 0,5 мкм, без жгутика. В мате вместе с вами живут бродильщики и пурпурные серные бактерии. Сверху светло, но жжёт ультрафиолет. Снизу поднимается сероводород. Органика скапливается пятнами.</p>
+    <p>Жизнь длится ${LIFE} секунд. Энергия идёт на деление, поэтому побеждает линия, которая делится чаще остальных. После каждой жизни — отбор и выбор одной мутации из трёх.</p>
+    <p class="chron">Цель прототипа: занять <b>60 % популяции</b> к 4-му поколению или позже. Если доля упадёт ниже 2 %, линия вымрет. На всё — 10 поколений.</p>
+    <div class="actions"><button class="btn primary" id="go">Начать</button></div>`);
+  $("go").onclick = () => { S.phase = "play"; hideModal(); };
+  $("go").focus();
+}
+function rowsHTML() {
+  const e = S.stats.en, mx = Math.max(e.food + e.photo, e.mV + e.mG + e.mT, 1e-6);
+  const bar = (v, col) => `<span style="width:${v / mx * 100}%;background:${col}"></span>`;
+  return `<div class="rows">
+    <div class="row"><span>Приток</span><div class="bar">${bar(e.food, "var(--good)")}${bar(e.photo, "var(--sun)")}</div><span class="v">${fmt(e.food + e.photo, 1)}</span></div>
+    <div class="row"><span>Расход</span><div class="bar">${bar(e.mV, "#e58a7a")}${bar(e.mG, "var(--bad)")}${bar(e.mT, "#a44a3f")}</div><span class="v">${fmt(e.mV + e.mG + e.mT, 1)}</span></div>
+  </div>
+  <p class="hint">Приток: <span style="color:var(--good)">органика</span>, <span style="color:var(--sun)">свет</span>. Расход: объём, гены, приобретённые системы (слева направо). Энергия всей линии за жизнь, Э.</p>`;
+}
+function showSummary(cnt, share) {
+  const st = S.stats, prev = S.history.at(-2)?.share;
+  const delta = prev == null ? "" : ` (${share >= prev ? "+" : "−"}${Math.abs(Math.round((share - prev) * 100))} п. п.)`;
+  const ids = draft();
+  showModal(`
+    <h2>Поколение ${S.gen}: доля линии ${Math.round(share * 100)} %${delta}</h2>
+    <p class="stat">Ваших клеток <b>${cnt.own}</b> · бродильщиков <b>${cnt.ferm}</b> · пурпурных <b>${cnt.purp}</b> · делений <b>${st.births.own}</b> · гибель: голод <b>${st.deaths.starve}</b>, УФ <b>${st.deaths.uv}</b>, фаг <b>${st.deaths.phage}</b></p>
+    ${rowsHTML()}
+    ${chronicle(cnt, share).map(t => `<p class="chron">${t}</p>`).join("")}
+    <h2 style="font-size:16px">Мутация для следующего поколения</h2>
+    <div class="cards">${ids.map(id => cardHTML(id)).join("")}</div>
+    <div class="actions"><button class="btn" id="skip">Пропустить мутацию</button></div>`);
+  modal.querySelectorAll(".card").forEach(b => b.onclick = () => { takeCard(S.genomes.own, b.dataset.id); nextGeneration(); });
+  $("skip").onclick = nextGeneration;
+  modal.querySelector(".card")?.focus();
+}
+function cardHTML(id) {
+  const c = CARDS[id];
+  const gtxt = id === "slim" ? `−${Math.round(S.genomes.own.G * 0.1)} генов` : `+${c.G} генов`;
+  return `<button class="card" data-id="${id}">
+    <span class="k ${c.rare ? "rare" : ""}">${c.group}${c.rare ? " · редкая" : ""}</span>
+    <span class="n">${c.name}</span>
+    <span class="e">${c.eff}</span>
+    <span class="c">${gtxt}${c.cost ? ` · содержание +${fmt(c.cost * M0, 4)} Э/такт` : ""}</span>
+    <span class="s">${c.sci}</span></button>`;
+}
+function showEnd(win, cnt, share) {
+  S.phase = "end";
+  const g = S.genomes.own;
+  showModal(`
+    <h2>${win ? "Линия закрепилась в мате" : cnt.own === 0 ? "Линия вымерла" : share < 0.02 ? "Линия вытеснена" : "Эпоха не пройдена"}</h2>
+    <p>Поколение ${S.gen}, доля ${Math.round(share * 100)} %. Геном: ${g.G} генов, радиус ${fmt(g.r, 2)} мкм. Мутации: ${g.cards.length ? g.cards.map(id => CARDS[id].name).join(", ") : "нет"}.</p>
+    <p class="stat">Доля по поколениям: ${S.history.map(h => Math.round(h.share * 100) + " %").join(" → ")}</p>
+    <p class="chron">${win ? "<b>Что дальше в полной игре.</b> Линия продолжит путь к энергетическому потолку прокариот, а выход из него — эндосимбиоз и эпоха 2." : "<b>Так бывает.</b> Большинство линий в истории жизни вымерли. Попробуйте другую стратегию: каждая среда вознаграждает своё."}</p>
+    <div class="actions"><button class="btn primary" id="again">Сыграть снова</button></div>`);
+  $("again").onclick = () => { restart(); S.phase = "play"; hideModal(); };
+}
+
+function updatePanel() {
+  $("gen").textContent = S.gen;
+  $("timer").textContent = Math.max(0, Math.ceil(LIFE - S.t));
+  const cnt = countLin(), tot = cnt.own + cnt.ferm + cnt.purp || 1;
+  $("share").innerHTML = ORDER.map(l => `<span style="width:${cnt[l] / tot * 100}%;background:${LIN[l].color}" title="${LIN[l].name}: ${cnt[l]}"></span>`).join("");
+  const p = S.player, b = p?.bal;
+  if (b) {
+    const r = (n, v, cls) => `<span>${n}</span><span class="v ${cls}">${v >= 0 && cls === "in" ? "+" : cls === "out" ? "−" : ""}${fmt(Math.abs(v), 4)}</span>`;
+    $("bal").innerHTML = r("Органика", b.food, "in") + (S.genomes.own.photo ? r("Свет", b.photo, "in") : "") +
+      r("Поддержание объёма", b.mV, "out") + r("Поддержание генов", b.mG, "out") + (b.mT > 0 ? r("Системы", b.mT, "out") : "") +
+      `<span class="sum">Итог${b.net >= P.mumax * b.ediv - 1e-9 ? " (потолок рибосом)" : ""}</span><span class="v sum" style="color:${b.net >= 0 ? "var(--good)" : "var(--bad)"}">${b.net >= 0 ? "+" : "−"}${fmt(Math.abs(b.net), 4)}</span>` +
+      `<span class="stat" style="grid-column:1/-1;margin-top:6px">Цена деления: объём <b>${fmt(P.e * S.genomes.own.r ** 3, 3)}</b> + копия генома <b>${fmt(P.d * S.genomes.own.G, 3)}</b> Э</span>`;
+    $("eMeter").style.width = Math.min(100, p.E / b.ediv * 100) + "%";
+    $("dMeter").style.width = Math.min(100, p.dmg * 100) + "%";
+  } else $("bal").innerHTML = `<span class="hint">Нет живых клеток линии.</span><span></span>`;
+  const g = S.genomes.own;
+  $("gstat").innerHTML = `<b>${g.G}</b> генов · r = <b>${fmt(g.r, 2)}</b> мкм · выход ×<b>${g.Y}</b>`;
+  $("genes").innerHTML = g.cards.length ? g.cards.map(id => `<span class="chip">${CARDS[id].name}</span>`).join("") : `<span class="hint">Пока только гликолиз и брожение.</span>`;
+}
+
+// ---------- Отрисовка ----------
+const cv = $("cv"), ctx = cv.getContext("2d");
+const fieldCv = document.createElement("canvas"); fieldCv.width = GW; fieldCv.height = GH;
+const fctx = fieldCv.getContext("2d"), fimg = fctx.createImageData(GW, GH);
+const bg = (() => {
+  const c = document.createElement("canvas"); c.width = W; c.height = H; const x = c.getContext("2d");
+  const gr = x.createLinearGradient(0, 0, 0, H);
+  gr.addColorStop(0, "#34473a"); gr.addColorStop(0.18, "#1a2f36"); gr.addColorStop(0.55, "#251d36"); gr.addColorStop(1, "#2e2717");
+  x.fillStyle = gr; x.fillRect(0, 0, W, H);
+  return c;
+})();
+function draw() {
+  ctx.drawImage(bg, 0, 0);
+  // органика — тепловая карта
+  for (let k = 0; k < GW * GH; k++) {
+    const v = Math.min(1, Math.sqrt(S.org[k] / 1.6));
+    fimg.data[k * 4] = 130; fimg.data[k * 4 + 1] = 205; fimg.data[k * 4 + 2] = 120; fimg.data[k * 4 + 3] = v * 120;
+  }
+  fctx.putImageData(fimg, 0, 0);
+  ctx.imageSmoothingEnabled = true; ctx.drawImage(fieldCv, 0, 0, W, H);
+  // свет сверху, УФ-зона
+  const lg = ctx.createLinearGradient(0, 0, 0, 260);
+  lg.addColorStop(0, "rgba(240,192,106,.28)"); lg.addColorStop(1, "rgba(240,192,106,0)");
+  ctx.fillStyle = lg; ctx.fillRect(0, 0, W, 260);
+  ctx.fillStyle = "rgba(160,120,255,.07)"; ctx.fillRect(0, 0, W, 110);
+  // H2S снизу
+  const sg = ctx.createLinearGradient(0, 330, 0, H);
+  sg.addColorStop(0, "rgba(210,200,120,0)"); sg.addColorStop(1, "rgba(210,200,120,.16)");
+  ctx.fillStyle = sg; ctx.fillRect(0, 330, W, H - 330);
+  // подписи слоёв
+  ctx.font = "12px 'JetBrains Mono', monospace"; ctx.fillStyle = "rgba(219,230,227,.8)";
+  ctx.fillText("свет · УФ", 10, 18); ctx.fillText("слой свет + H₂S", 10, 300); ctx.fillText("ил · H₂S", 10, H - 12);
+  ctx.strokeStyle = "rgba(160,120,255,.35)"; ctx.setLineDash([4, 6]); ctx.beginPath(); ctx.moveTo(0, 110); ctx.lineTo(W, 110); ctx.stroke(); ctx.setLineDash([]);
+  // шкала
+  ctx.fillStyle = "rgba(219,230,227,.7)"; ctx.fillRect(W - 110, H - 22, 60, 2); ctx.fillText("5 мкм", W - 46, H - 17);
+  // фаги
+  ctx.fillStyle = "#ef6f5e";
+  for (const p of S.phages) { ctx.beginPath(); ctx.arc(p.x, p.y, 2.4, 0, 6.28); ctx.fill(); }
+  // клетки
+  const t = performance.now() / 1000;
+  for (const c of S.cells) {
+    const g = S.genomes[c.lin], rad = 3 + g.r * 9, col = LIN[c.lin].color;
+    if (g.flag) {
+      ctx.strokeStyle = col; ctx.globalAlpha = .5; ctx.lineWidth = 1; ctx.beginPath();
+      const bx = -Math.cos(c.dir), by = -Math.sin(c.dir);
+      for (let s = 0; s <= 8; s++) {
+        const d = rad + s * 1.6, w = Math.sin(s * 1.2 + t * 14 + c.id * 9) * 1.6;
+        const x = c.x + bx * d - by * w, y = c.y + by * d + bx * w;
+        s ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      }
+      ctx.stroke(); ctx.globalAlpha = 1;
+    }
+    if (g.capsule) { ctx.fillStyle = col + "22"; ctx.beginPath(); ctx.arc(c.x, c.y, rad + 2.5, 0, 6.28); ctx.fill(); }
+    ctx.fillStyle = c.inf >= 0 ? "#ef6f5e" : col;
+    ctx.globalAlpha = 0.55 + 0.45 * Math.min(1, c.E / 0.3);
+    ctx.beginPath(); ctx.ellipse(c.x, c.y, rad * 1.15, rad * 0.85, c.dir, 0, 6.28); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  if (S.player) {
+    const g = S.genomes.own, rad = 3 + g.r * 9;
+    ctx.strokeStyle = "#f0c06a"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(S.player.x, S.player.y, rad + 6, 0, 6.28); ctx.stroke();
+    if (target) { ctx.strokeStyle = "rgba(240,192,106,.5)"; ctx.setLineDash([3, 4]); ctx.beginPath(); ctx.moveTo(S.player.x, S.player.y); ctx.lineTo(target.x, target.y); ctx.stroke(); ctx.setLineDash([]); }
+  }
+}
+
+// ---------- Ввод и цикл ----------
+function toWorld(ev) {
+  const r = cv.getBoundingClientRect();
+  return { x: (ev.clientX - r.left) / r.width * W, y: (ev.clientY - r.top) / r.height * H };
+}
+cv.addEventListener("pointerdown", ev => { target = toWorld(ev); cv.setPointerCapture(ev.pointerId); });
+cv.addEventListener("pointermove", ev => { if (ev.buttons) target = toWorld(ev); });
+const KMAP = { ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right", ArrowUp: "up", KeyW: "up", ArrowDown: "down", KeyS: "down" };
+addEventListener("keydown", ev => {
+  if (KMAP[ev.code]) { keys.add(KMAP[ev.code]); ev.preventDefault(); }
+  if (ev.code === "Space" && S.phase === "play") { togglePause(); ev.preventDefault(); }
+});
+addEventListener("keyup", ev => { if (KMAP[ev.code]) keys.delete(KMAP[ev.code]); });
+function togglePause() { S.paused = !S.paused; $("pause").textContent = S.paused ? "Дальше" : "Пауза"; }
+$("pause").onclick = togglePause;
+$("speed").onclick = () => { S.speed = S.speed === 1 ? 3 : 1; $("speed").textContent = `Скорость ×${S.speed}`; $("speed").setAttribute("aria-pressed", S.speed > 1); };
+
+function fit() {
+  const st = $("stage"), narrow = innerWidth <= 820;
+  const w = st.clientWidth, h = narrow ? Math.min(innerHeight * 0.62, w * H / W) : st.clientHeight;
+  const s = Math.min(w / W, h / H);
+  cv.style.width = W * s + "px"; cv.style.height = H * s + "px";
+  if (narrow) st.style.height = H * s + "px"; else st.style.height = "";
+}
+addEventListener("resize", fit);
+
+function restart() {
+  S = newWorld(); placeHotspots(); initFields(); spawnFresh(); beginLife();
+}
+let last = performance.now(), panelT = 0;
+function frame(now) {
+  const real = Math.min(0.05, (now - last) / 1000); last = now;
+  if (S.phase === "play" && !S.paused) {
+    const steps = S.speed;
+    for (let i = 0; i < steps; i++) step(real);
+    if (S.t >= LIFE) { S.phase = "summary"; endLife(); }
+  }
+  draw();
+  panelT += real; if (panelT > 0.2) { panelT = 0; updatePanel(); }
+  requestAnimationFrame(frame);
+}
+// Отладка баланса: window.__fast(n) прогоняет n поколений без отрисовки, выбирая первую карту.
+window.__fast = (n, pick = 0) => {
+  const log = [];
+  for (let k = 0; k < n && S.phase !== "end"; k++) {
+    S.phase = "play"; hideModal();
+    while (S.t < LIFE) step(1 / 30);
+    const cnt = countLin(); log.push({ gen: S.gen, ...cnt, G: S.genomes.own.G });
+    S.phase = "summary"; endLife();
+    if (S.phase === "end") break;
+    const ids = draft(); if (pick >= 0 && ids[pick]) takeCard(S.genomes.own, ids[pick]);
+    nextGeneration();
+  }
+  return log;
+};
+
+restart(); fit(); updatePanel(); showIntro();
+requestAnimationFrame(frame);
+</script>
